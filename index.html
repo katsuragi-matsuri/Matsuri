@@ -20,47 +20,25 @@
 
     /* 一覧パネルのデザイン */
     #status-list-panel {
-      position: absolute;
-      top: 10px;
-      right: 10px;
-      z-index: 1000;
-      background: rgba(255, 255, 255, 0.95);
-      padding: 8px;
-      border-radius: 5px;
-      box-shadow: 0 2px 5px rgba(0,0,0,0.3);
-      max-height: 80%;
-      overflow-y: auto;
-      font-size: 12px;
-      pointer-events: auto;
+      position: absolute; top: 10px; right: 10px; z-index: 1000;
+      background: rgba(255, 255, 255, 0.95); padding: 8px; border-radius: 5px;
+      box-shadow: 0 2px 5px rgba(0,0,0,0.3); max-height: 80%; overflow-y: auto;
+      font-size: 12px; pointer-events: auto;
     }
     
-    /* ボタンの共通デザイン */
+    /* ボタンのデザイン */
     #toggle-btn {
-      background-color: #f8f9fa;
-      border: 1px solid #ccc;
-      padding: 6px 10px;
-      border-radius: 4px;
-      text-align: center;
-      font-weight: bold;
-      cursor: pointer;
-      font-size: 13px;
-      color: #333;
+      background-color: #f8f9fa; border: 1px solid #ccc; padding: 6px 10px;
+      border-radius: 4px; text-align: center; font-weight: bold; cursor: pointer;
+      font-size: 13px; color: #333;
     }
     
-    /* ★★★ 追加：「今すぐ更新」ボタンのデザイン ★★★ */
     #refresh-btn {
-      background-color: #e9ecef;
-      border: 1px solid #ccc;
-      padding: 6px 10px;
-      border-radius: 4px;
-      text-align: center;
-      font-weight: bold;
-      cursor: pointer;
-      font-size: 13px;
-      color: #333;
-      margin-top: 5px; /* 上のボタンとの隙間 */
+      background-color: #e9ecef; border: 1px solid #ccc; padding: 6px 10px;
+      border-radius: 4px; text-align: center; font-weight: bold; cursor: pointer;
+      font-size: 13px; color: #333; margin-top: 5px;
     }
-    #refresh-btn:active { background-color: #ced4da; } /* 押した瞬間に少し暗くする効果 */
+    #refresh-btn:active { background-color: #ced4da; }
     
     #list-content { display: none; margin-top: 10px; }
     #update-time { display: block; text-align: center; font-size: 10px; color: #666; margin-bottom: 5px; border-bottom: 1px solid #ccc; padding-bottom: 4px; }
@@ -78,7 +56,6 @@
     <div id="map"></div>
     <div id="status-list-panel">
       <div id="toggle-btn" onclick="toggleList()">📋 空き状況一覧を開く</div>
-      
       <div id="refresh-btn" onclick="loadParkingData()">🔄 今すぐ更新</div>
       
       <div id="list-content">
@@ -99,7 +76,7 @@
       attribution: "<a href='https://maps.gsi.go.jp/development/ichiran.html' target='_blank'>国土地理院</a>"
     }).addTo(map);
 
-    // ★★★ ここにGASのURL ★★★
+    // ★ GASのURLを組み込み済み
     var gasUrl = "https://script.google.com/macros/s/AKfycby31srJLpaJ8mVhonQMxIEQTQENDs-nYMBa9hNBoSV7uRjCF7n28CQOJu9YW14yFGGH/exec";
     var markers = [];
 
@@ -116,8 +93,18 @@
     }
 
     function loadParkingData() {
-      fetch(gasUrl)
-        .then(response => response.json())
+      // 視覚的フィードバック：押した瞬間に文字を変える
+      var btn = document.getElementById('refresh-btn');
+      if (btn) btn.innerText = "🔄 更新中...";
+
+      // URLの末尾にタイムスタンプを付与し、ブラウザのキャッシュを強制的に回避する
+      var fetchUrl = gasUrl + (gasUrl.indexOf('?') > -1 ? '&' : '?') + '_=' + new Date().getTime();
+
+      fetch(fetchUrl)
+        .then(response => {
+          if (!response.ok) throw new Error("通信エラーが発生しました(ステータス: " + response.status + ")");
+          return response.json();
+        })
         .then(data => {
           markers.forEach(marker => map.removeLayer(marker));
           markers = [];
@@ -185,12 +172,19 @@
           var hours = String(now.getHours()).padStart(2, '0');
           var minutes = String(now.getMinutes()).padStart(2, '0');
           document.getElementById('update-time').innerText = "(" + hours + ":" + minutes + " 時点)";
+          
+          // 元の文字に戻す
+          if (btn) btn.innerText = "🔄 今すぐ更新";
         })
-        .catch(error => console.error("通信エラー:", error));
+        .catch(error => {
+          console.error("エラー:", error);
+          alert("データの読み込みに失敗しました。時間をおいて再度お試しください。\n原因: " + error.message);
+          if (btn) btn.innerText = "🔄 今すぐ更新";
+        });
     }
 
     loadParkingData();
-    setInterval(loadParkingData, 60000); // 1分ごとの自動更新もそのまま維持
+    setInterval(loadParkingData, 60000);
   </script>
 </body>
 </html>
