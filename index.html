@@ -7,60 +7,32 @@
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <style>
-    /* 画面分割のレイアウト */
     body { margin: 0; padding: 0; font-family: sans-serif; display: flex; flex-direction: column; height: 100vh; }
-    
     #map-wrapper { position: relative; flex: 1; width: 100%; min-height: 45vh; }
     #map { width: 100%; height: 100%; }
-    
     #form-area { flex: 1; width: 100%; min-height: 55vh; border-top: 3px solid #333; }
     iframe { width: 100%; height: 100%; border: none; }
-    
     .popup-title { font-weight: bold; font-size: 14px; margin-bottom: 5px; }
 
-    /* ★★★ 変更：一覧パネルのデザイン（折りたたみ対応） ★★★ */
     #status-list-panel {
-      position: absolute;
-      top: 10px;
-      right: 10px;
-      z-index: 1000;
-      background: rgba(255, 255, 255, 0.95); /* 少し白を濃くして見やすく */
-      padding: 8px;
-      border-radius: 5px;
-      box-shadow: 0 2px 5px rgba(0,0,0,0.3);
-      max-height: 80%;
-      overflow-y: auto;
-      font-size: 12px;
-      pointer-events: auto;
+      position: absolute; top: 10px; right: 10px; z-index: 1000;
+      background: rgba(255, 255, 255, 0.95); padding: 8px; border-radius: 5px;
+      box-shadow: 0 2px 5px rgba(0,0,0,0.3); max-height: 80%; overflow-y: auto;
+      font-size: 12px; pointer-events: auto;
     }
-    
-    /* 開閉用のボタンデザイン */
     #toggle-btn {
-      background-color: #f8f9fa;
-      border: 1px solid #ccc;
-      padding: 6px 10px;
-      border-radius: 4px;
-      text-align: center;
-      font-weight: bold;
-      cursor: pointer;
-      font-size: 13px;
-      color: #333;
+      background-color: #f8f9fa; border: 1px solid #ccc; padding: 6px 10px;
+      border-radius: 4px; text-align: center; font-weight: bold; cursor: pointer;
+      font-size: 13px; color: #333;
     }
-    
-    /* リストの中身（初期状態は隠しておく） */
-    #list-content {
-      display: none; 
-      margin-top: 10px;
-    }
-
-    #update-time { display: block; text-align: center; font-size: 10px; color: #666; font-weight: normal; margin-bottom: 5px; border-bottom: 1px solid #ccc; padding-bottom: 4px; }
+    #list-content { display: none; margin-top: 10px; }
+    #update-time { display: block; text-align: center; font-size: 10px; color: #666; margin-bottom: 5px; border-bottom: 1px solid #ccc; padding-bottom: 4px; }
     #status-list-panel table { width: 100%; border-collapse: collapse; }
     #status-list-panel td { padding: 4px 5px; border-bottom: 1px dashed #eee; vertical-align: middle; }
     
     .status-text-blue { color: blue; font-weight: bold; }
     .status-text-orange { color: orange; font-weight: bold; }
     .status-text-red { color: red; font-weight: bold; }
-    .vacant-text { font-size: 10px; color: #555; margin-left: 5px; font-weight: normal; }
   </style>
 </head>
 <body>
@@ -69,11 +41,9 @@
     <div id="map"></div>
     <div id="status-list-panel">
       <div id="toggle-btn" onclick="toggleList()">📋 空き状況一覧を開く</div>
-      
       <div id="list-content">
         <span id="update-time">(--:-- 時点)</span>
-        <table id="status-table">
-          </table>
+        <table id="status-table"></table>
       </div>
     </div>
   </div>
@@ -83,23 +53,19 @@
   </div>
 
   <script>
-    // 地図の初期設定
     var map = L.map('map').setView([34.295261575345286, 135.51751990257273], 15);
 
     L.tileLayer('https://cyberjapandata.gsi.go.jp/xyz/pale/{z}/{x}/{y}.png', {
       attribution: "<a href='https://maps.gsi.go.jp/development/ichiran.html' target='_blank'>国土地理院</a>"
     }).addTo(map);
 
-    // ★★★ ここにGASのURLを入れます ★★★
+    // ★★★ ここにGASのURL ★★★
     var gasUrl = "https://script.google.com/macros/s/AKfycby31srJLpaJ8mVhonQMxIEQTQENDs-nYMBa9hNBoSV7uRjCF7n28CQOJu9YW14yFGGH/exec";
     var markers = [];
 
-    // ★★★ 追加：リストを開閉するプログラム ★★★
     function toggleList() {
       var content = document.getElementById('list-content');
       var btn = document.getElementById('toggle-btn');
-      
-      // もし隠れていたら表示し、表示されていたら隠す
       if (content.style.display === 'none' || content.style.display === '') {
         content.style.display = 'block';
         btn.innerText = '▼ 一覧を閉じる';
@@ -115,56 +81,65 @@
         .then(data => {
           markers.forEach(marker => map.removeLayer(marker));
           markers = [];
-
           var tableHtml = "";
 
           data.forEach(park => {
             if (!park.lat || !park.lng || isNaN(park.lat) || isNaN(park.lng)) return;
 
+            var capacity = Number(park.capacity);
+            var parkedRaw = park.status; // C列の値（駐車台数 または 未入力）
+            
             var color = 'blue';
             var currentStatus = "空きあり";
-            var capacity = Number(park.capacity);
-            var parked = Number(park.status);
+            var listStatusText = "";
+            var textClass = 'status-text-blue';
 
-            if (!isNaN(capacity) && !isNaN(parked) && capacity > 0) {
-              var rate = parked / capacity;
-              if (rate >= 1.0) { color = 'red'; currentStatus = "満車"; }
-              else if (rate >= 0.7) { color = 'orange'; currentStatus = "混雑"; }
-              else if (parked === 0 && park.status !== 0 && park.status !== "0") { currentStatus = "未報告"; }
+            // 数字がまだ報告されていない場合
+            if (parkedRaw === "未入力" || parkedRaw === "未報告" || parkedRaw === "") {
+              currentStatus = "未入力";
+              listStatusText = "<span style='color:gray; font-weight:normal;'>未入力</span>";
+              textClass = '';
             } else {
-              if (park.status === '満車') { color = 'red'; currentStatus = "満車"; }
-              else if (park.status === '混雑') { color = 'orange'; currentStatus = "混雑"; }
-              else if (park.status === 0 || park.status === "0" || park.status === "未報告") { currentStatus = "未報告"; }
-              else { currentStatus = park.status; }
+              // 数字をもとに混雑度を自動判定（1.0=満車、0.7=混雑）
+              var parked = Number(parkedRaw);
+              var rate = parked / capacity;
+              
+              if (rate >= 1.0) {
+                color = 'red';
+                currentStatus = "満車";
+                listStatusText = "満車";
+                textClass = 'status-text-red';
+              } else if (rate >= 0.7) {
+                color = 'orange';
+                currentStatus = "混雑";
+                listStatusText = "混雑(空" + park.vacant + "台)";
+                textClass = 'status-text-orange';
+              } else {
+                color = 'blue';
+                currentStatus = "空きあり";
+                listStatusText = "空" + park.vacant + "台";
+                textClass = 'status-text-blue';
+              }
             }
 
-            var marker = L.circleMarker([park.lat, park.lng], {
+            // 地図ピンの配置
+            var marker = L.circleMarker([park.lat, pin_lng = park.lng], {
               color: color, fillColor: color, fillOpacity: 0.8, radius: 12
             }).addTo(map);
+
+            var popupVacant = (currentStatus === "未入力") ? "不明" : park.vacant + "台";
+            var popupParked = (currentStatus === "未入力") ? "不明" : parkedRaw + "台";
 
             var popupContent = "<div class='popup-title'>" + park.name + "</div>" +
                                "現在の状況：<b>" + currentStatus + "</b><br>" +
                                "駐車可能台数：" + park.capacity + "台<br>" +
-                               "現在の駐車： " + park.status + "台<br>" +
-                               "現在の空き： <b>" + park.vacant + "台</b>";
+                               "現在の駐車： " + popupParked + "<br>" +
+                               "現在の空き： <b>" + popupVacant + "</b>";
 
             marker.bindPopup(popupContent);
             markers.push(marker);
 
-            var textClass = 'status-text-blue';
-            if (color === 'red') textClass = 'status-text-red';
-            if (color === 'orange') textClass = 'status-text-orange';
-            
-            var listStatusText = currentStatus;
-            
-            if (currentStatus === "空きあり" && park.vacant !== "") {
-              listStatusText = "空" + park.vacant + "台";
-            } else if (currentStatus === "混雑" && park.vacant !== "") {
-              listStatusText = "混雑(空" + park.vacant + "台)";
-            } else if (currentStatus === "満車") {
-              listStatusText = "満車";
-            }
-            
+            // リストの行を作成
             tableHtml += "<tr><td>" + park.name + "</td><td class='" + textClass + "'>" + listStatusText + "</td></tr>";
           });
 
