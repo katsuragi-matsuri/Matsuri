@@ -16,6 +16,7 @@
     .popup-title { font-weight: bold; font-size: 14px; margin-bottom: 5px; }
     .staff-popup-title { font-weight: bold; font-size: 13px; margin-bottom: 5px; color: #333; border-bottom: 2px solid #ccc; padding-bottom: 3px;}
 
+    /* パネルのデザイン */
     #status-list-panel {
       position: absolute; top: 10px; right: 10px; z-index: 1000;
       background: rgba(255, 255, 255, 0.95); padding: 8px; border-radius: 5px;
@@ -66,15 +67,34 @@
   </div>
 
   <script>
-    var map = L.map('map').setView([34.295261575345286, 135.51751990257273], 15);
+    // 1. 切り替えたい地図のデータを2種類とも準備する
+    var googleStandard = L.tileLayer('https://mt1.google.com/vt/lyrs=r&x={x}&y={y}&z={z}', {
+      attribution: "<a href='https://maps.google.com/' target='_blank'>Google Map</a>"
+    });
 
-    L.tileLayer('https://cyberjapandata.gsi.go.jp/xyz/pale/{z}/{x}/{y}.png', {
-      attribution: "<a href='https://maps.gsi.go.jp/development/ichiran.html' target='_blank'>国土地理院</a>"
-    }).addTo(map);
+    var googleHybrid = L.tileLayer('https://mt1.google.com/vt/lyrs=y&x={x}&y={y}&z={z}', {
+      attribution: "<a href='https://maps.google.com/' target='_blank'>Google Map</a>"
+    });
+
+    // 2. 地図を作成し、最初は「標準地図」を表示させておく
+    var map = L.map('map', {
+      center: [34.295261575345286, 135.51751990257273],
+      zoom: 15,
+      layers: [googleStandard]
+    });
+
+    // 3. 地図の切り替えメニューを作る
+    var baseMaps = {
+      "🗺️ 標準地図": googleStandard,
+      "🛰️ 航空写真": googleHybrid
+    };
+
+    // 画面の左上に切り替えボタンを配置する（右側はリストがあるため）
+    L.control.layers(baseMaps, null, { position: 'topleft' }).addTo(map);
 
     var gasUrl = "https://script.google.com/macros/s/AKfycbz4Y5CLI1lClReA_rkjtC5bjKpqw_iY_DldGUKp74dPC26qnxAkmvTay99tdLJ7UlHh/exec";
     var parkingMarkers = [];
-    var staffMarkers = []; // スタッフ用のピン管理配列
+    var staffMarkers = [];
 
     function toggleList() {
       var content = document.getElementById('list-content');
@@ -90,7 +110,6 @@
       btn.innerText = (content.style.display === 'block') ? '▼ スタッフ配置一覧' : '👥 スタッフ配置一覧';
     }
 
-    // ★★★ 変更：駐車場とスタッフの両方のデータを読み込んで配置するメイン処理 ★★★
     function updateAllData() {
       var btn = document.getElementById('refresh-btn');
       if (btn) btn.innerText = "🔄 更新中...";
@@ -99,7 +118,6 @@
       var parkingFetchUrl = gasUrl + (gasUrl.indexOf('?') > -1 ? '&' : '?') + timestamp;
       var staffFetchUrl = gasUrl + (gasUrl.indexOf('?') > -1 ? '&' : '?') + 'type=staff&' + timestamp;
 
-      // 両方の通信を同時に行い、揃ってから画面を描き換える処理
       Promise.all([
         fetch(parkingFetchUrl).then(res => res.json()),
         fetch(staffFetchUrl).then(res => res.json())
@@ -113,21 +131,42 @@
 
         staffData.forEach(function(s) {
           if (!s.lat || !s.lng || isNaN(s.lat) || isNaN(s.lng)) return;
-          var pinColor = (s.category === "駐禁") ? "#9c27b0" : "#4caf50";
           
-          var marker = L.circleMarker([s.lat, s.lng], {
-            color: '#ffffff', weight: 2, fillColor: pinColor, fillOpacity: 1.0, radius: 7
-          }).addTo(map);
+          var pinColor = "#2196f3"; // その他（青）
+          var pinEmoji = "👤";       
+          
+          // ★★★ 対策：未入力やエラーを防ぐため、文字列に強制変換して安全にチェックする ★★★
+          var categoryStr = s.category ? String(s.category) : "";
+          var postStr = s.post ? String(s.post) : "";
+          
+          if (categoryStr.indexOf("駐禁") !== -1 || postStr.indexOf("駐禁") !== -1) {
+            pinColor = "#9c27b0"; // 紫（駐禁担当）
+          } 
+          else if (categoryStr.indexOf("駐車場") !== -1 || postStr.indexOf("駐車場") !== -1) {
+            pinColor = "#4caf50"; // 緑（駐車場担当）
+          } 
+          else if (categoryStr.indexOf("会場") !== -1 || postStr.indexOf("会場") !== -1) {
+            pinColor = "#e91e63"; // ピンク（会場担当）
+          }
+          
+          var customIcon = L.divIcon({
+            html: `<div style="font-size: 15px; background: ${pinColor}; border-radius: 50%; width: 26px; height: 26px; display: flex; align-items: center; justify-content: center; border: 2px solid white; box-shadow: 0 2px 4px rgba(0,0,0,0.3); color: white;">${pinEmoji}</div>`,
+            className: 'empty-class',
+            iconSize: [30, 30],
+            iconAnchor: [15, 15]
+          });
 
-          var popupContent = "<div class='staff-popup-title'>📍 " + s.post + "</div>" +
-                             "<span style='color:gray; font-size:11px;'>分類：" + s.category + "担当</span><br>" +
-                             "リーダー：" + s.leader + "<br>" +
-                             "スタッフ：" + s.staff;
+          var marker = L.marker([s.lat, s.lng], { icon: customIcon }).addTo(map);
+
+          var popupContent = "<div class='staff-popup-title'>📍 " + postStr + "</div>" +
+                             "<span style='color:gray; font-size:11px;'>分類：" + categoryStr + "</span><br>" +
+                             "リーダー：" + (s.leader ? s.leader : "なし") + "<br>" +
+                             "スタッフ：" + (s.staff ? s.staff : "なし");
           marker.bindPopup(popupContent);
           staffMarkers.push(marker);
 
-          staffTableHtml += "<tr><td style='padding-top:6px; font-weight:bold; font-size:11px;'><span style='color:" + pinColor + "'>●</span> " + s.post + "</td></tr>";
-          staffTableHtml += "<tr><td style='padding-bottom:6px; font-size:10px; color:#555; border-bottom:1px dashed #eee;'>👤 " + s.staff + "</td></tr>";
+          staffTableHtml += "<tr><td style='padding-top:6px; font-weight:bold; font-size:11px;'><span style='color:" + pinColor + "'>●</span> " + postStr + "</td></tr>";
+          staffTableHtml += "<tr><td style='padding-bottom:6px; font-size:10px; color:#555; border-bottom:1px dashed #eee;'>👤 " + (s.staff ? s.staff : "未定") + "</td></tr>";
         });
         document.getElementById('staff-table').innerHTML = staffTableHtml;
 
@@ -197,12 +236,12 @@
         if (btn) btn.innerText = "🔄 データを一括更新";
       })
       .catch(error => {
-        console.error("エラー:", error);
+        console.error("一括更新エラー:", error);
+        alert("データの読み込み処理でエラーが発生しました。\nGASの公開設定が『全員』になっているか、またはシート名が正しいかご確認ください。\nエラー内容: " + error.message);
         if (btn) btn.innerText = "🔄 データを一括更新";
       });
     }
 
-    // 初回読み込みと、1分ごとの定期更新の実行
     updateAllData();
     setInterval(updateAllData, 60000);
   </script>
