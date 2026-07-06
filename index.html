@@ -16,7 +16,6 @@
     .popup-title { font-weight: bold; font-size: 14px; margin-bottom: 5px; }
     .staff-popup-title { font-weight: bold; font-size: 13px; margin-bottom: 5px; color: #333; border-bottom: 2px solid #ccc; padding-bottom: 3px;}
 
-    /* パネルのデザイン */
     #status-list-panel {
       position: absolute; top: 10px; right: 10px; z-index: 1000;
       background: rgba(255, 255, 255, 0.95); padding: 8px; border-radius: 5px;
@@ -24,13 +23,11 @@
       font-size: 12px; pointer-events: auto; width: 200px;
     }
     
-    /* ボタンのデザイン */
     .toggle-btn { background-color: #f8f9fa; border: 1px solid #ccc; padding: 6px 10px; border-radius: 4px; text-align: center; font-weight: bold; cursor: pointer; font-size: 12px; color: #333; margin-bottom: 5px; }
     #refresh-btn { background-color: #e9ecef; border: 1px solid #ccc; padding: 6px 10px; border-radius: 4px; text-align: center; font-weight: bold; cursor: pointer; font-size: 12px; color: #333; margin-top: 5px; }
     #refresh-btn:active { background-color: #ced4da; }
     
     #list-content, #staff-list-content { display: none; margin-top: 5px; margin-bottom: 10px; }
-    
     #total-status { display: block; text-align: center; font-size: 12px; font-weight: bold; color: #000; background-color: #e2f0d9; padding: 5px; border-radius: 4px; margin-bottom: 5px; }
     #update-time { display: block; text-align: center; font-size: 10px; color: #666; margin-bottom: 5px; border-bottom: 1px solid #ccc; padding-bottom: 4px; }
     
@@ -60,7 +57,7 @@
         <table id="staff-table"></table>
       </div>
 
-      <div id="refresh-btn" onclick="loadParkingData()">🔄 駐車場データを更新</div>
+      <div id="refresh-btn" onclick="updateAllData()">🔄 データを一括更新</div>
     </div>
   </div>
 
@@ -75,150 +72,139 @@
       attribution: "<a href='https://maps.gsi.go.jp/development/ichiran.html' target='_blank'>国土地理院</a>"
     }).addTo(map);
 
-    // スタッフ配置データ
-    var staffData = [
-      { category: "駐禁", post: "関係者駐車場", leader: "堀内大斗(総)", staff: "堀内大斗(総)", lat: 34.29569213, lng: 135.5153726 },
-      { category: "駐禁", post: "三谷こども園北側河川進入路", leader: "門阪泰憲(こ)", staff: "門阪泰憲(こ)", lat: 34.29142493, lng: 135.5183585 },
-      { category: "駐禁", post: "駐車禁止エリア警備1(西)", leader: "木村恵久(上)", staff: "丹田英男(福)", lat: 34.29722174, lng: 135.5172920 },
-      { category: "駐禁", post: "駐車禁止エリア警備2(中)", leader: "木村恵久(上)", staff: "木村恵久(上)", lat: 34.29657028, lng: 135.5187109 },
-      { category: "駐禁", post: "駐車禁止エリア警備3(東)", leader: "木村恵久(上)", staff: "齊藤元春(上)", lat: 34.29709544, lng: 135.5194592 },
-      { category: "駐禁", post: "Orange店舗駐車場", leader: "大家啓徳(税)", staff: "大家啓徳(税)", lat: 34.2985225, lng: 135.5215209 },
-      { category: "駐車場", post: "思いやり駐車場①", leader: "笠本泰丈(教)", staff: "笠本泰丈(教) / 森田淳子(農) / 山中麻衣(健) / 森咲太(建)", lat: 34.29568818, lng: 135.5137591 }
-    ];
-
-    var staffTableHtml = "";
-    staffData.forEach(function(s) {
-      var pinColor = (s.category === "駐禁") ? "#9c27b0" : "#4caf50";
-      
-      var marker = L.circleMarker([s.lat, s.lng], {
-        color: '#ffffff', weight: 2, fillColor: pinColor, fillOpacity: 1.0, radius: 7
-      }).addTo(map);
-
-      var popupContent = "<div class='staff-popup-title'>📍 " + s.post + "</div>" +
-                         "<span style='color:gray; font-size:11px;'>分類：" + s.category + "担当</span><br>" +
-                         "リーダー：" + s.leader + "<br>" +
-                         "スタッフ：" + s.staff;
-      marker.bindPopup(popupContent);
-
-      staffTableHtml += "<tr><td style='padding-top:6px; font-weight:bold; font-size:11px;'><span style='color:" + pinColor + "'>●</span> " + s.post + "</td></tr>";
-      staffTableHtml += "<tr><td style='padding-bottom:6px; font-size:10px; color:#555; border-bottom:1px dashed #eee;'>👤 " + s.staff + "</td></tr>";
-    });
-    
-    document.getElementById('staff-table').innerHTML = staffTableHtml;
+    var gasUrl = "https://script.google.com/macros/s/AKfycby31srJLpaJ8mVhonQMxIEQTQENDs-nYMBa9hNBoSV7uRjCF7n28CQOJu9YW14yFGGH/exec";
+    var parkingMarkers = [];
+    var staffMarkers = []; // スタッフ用のピン管理配列
 
     function toggleList() {
       var content = document.getElementById('list-content');
       var btn = document.getElementById('toggle-btn');
-      if (content.style.display === 'none' || content.style.display === '') {
-        content.style.display = 'block';
-        btn.innerText = '▼ 駐車場 空き状況';
-      } else {
-        content.style.display = 'none';
-        btn.innerText = '📋 駐車場 空き状況';
-      }
+      content.style.display = (content.style.display === 'block') ? 'none' : 'block';
+      btn.innerText = (content.style.display === 'block') ? '▼ 駐車場 空き状況' : '📋 駐車場 空き状況';
     }
 
     function toggleStaffList() {
       var content = document.getElementById('staff-list-content');
       var btn = document.getElementById('toggle-staff-btn');
-      if (content.style.display === 'none' || content.style.display === '') {
-        content.style.display = 'block';
-        btn.innerText = '▼ スタッフ配置一覧';
-      } else {
-        content.style.display = 'none';
-        btn.innerText = '👥 スタッフ配置一覧';
-      }
+      content.style.display = (content.style.display === 'block') ? 'none' : 'block';
+      btn.innerText = (content.style.display === 'block') ? '▼ スタッフ配置一覧' : '👥 スタッフ配置一覧';
     }
 
-    // GASのURLを組み込みました
-    var gasUrl = "https://script.google.com/macros/s/AKfycby31srJLpaJ8mVhonQMxIEQTQENDs-nYMBa9hNBoSV7uRjCF7n28CQOJu9YW14yFGGH/exec";
-    var parkingMarkers = [];
-
-    function loadParkingData() {
+    // ★★★ 変更：駐車場とスタッフの両方のデータを読み込んで配置するメイン処理 ★★★
+    function updateAllData() {
       var btn = document.getElementById('refresh-btn');
       if (btn) btn.innerText = "🔄 更新中...";
 
-      var fetchUrl = gasUrl + (gasUrl.indexOf('?') > -1 ? '&' : '?') + '_=' + new Date().getTime();
+      var timestamp = '_=' + new Date().getTime();
+      var parkingFetchUrl = gasUrl + (gasUrl.indexOf('?') > -1 ? '&' : '?') + timestamp;
+      var staffFetchUrl = gasUrl + (gasUrl.indexOf('?') > -1 ? '&' : '?') + 'type=staff&' + timestamp;
 
-      fetch(fetchUrl)
-        .then(response => {
-          if (!response.ok) throw new Error("通信エラー");
-          return response.json();
-        })
-        .then(data => {
-          parkingMarkers.forEach(marker => map.removeLayer(marker));
-          parkingMarkers = [];
-          var tableHtml = "";
-          var totalCapacity = 0;
-          var totalVacant = 0;
+      // 両方の通信を同時に行い、揃ってから画面を描き換える処理
+      Promise.all([
+        fetch(parkingFetchUrl).then(res => res.json()),
+        fetch(staffFetchUrl).then(res => res.json())
+      ])
+      .then(([parkingData, staffData]) => {
+        
+        // 1. スタッフデータの描画処理
+        staffMarkers.forEach(marker => map.removeLayer(marker));
+        staffMarkers = [];
+        var staffTableHtml = "";
 
-          data.forEach(park => {
-            if (!park.lat || !park.lng || isNaN(park.lat) || isNaN(park.lng)) return;
-
-            var capacity = Number(park.capacity);
-            var parkedRaw = park.status; 
-            var color = 'blue';
-            var currentStatus = "空きあり";
-            var listStatusText = "";
-            var textClass = 'status-text-blue';
-
-            if (parkedRaw === "未入力" || parkedRaw === "未報告" || parkedRaw === "") {
-              currentStatus = "未入力";
-              listStatusText = "<span style='color:gray; font-weight:normal;'>未入力</span>";
-              textClass = '';
-              totalCapacity += capacity;
-              totalVacant += capacity;
-            } else {
-              var parked = Number(parkedRaw);
-              var rate = parked / capacity;
-              totalCapacity += capacity;
-              totalVacant += Number(park.vacant);
-
-              if (rate >= 1.0) { color = 'red'; currentStatus = "満車"; listStatusText = "満車"; textClass = 'status-text-red'; }
-              else if (rate >= 0.7) { color = 'orange'; currentStatus = "混雑"; listStatusText = "混雑(空" + park.vacant + "台)"; textClass = 'status-text-orange'; }
-              else { color = 'blue'; currentStatus = "空きあり"; listStatusText = "空" + park.vacant + "台"; textClass = 'status-text-blue'; }
-            }
-
-            var marker = L.circleMarker([park.lat, park.lng], {
-              color: color, fillColor: color, fillOpacity: 0.8, radius: 12
-            }).addTo(map);
-
-            var popupVacant = (currentStatus === "未入力") ? "不明" : park.vacant + "台";
-            var popupParked = (currentStatus === "未入力") ? "不明" : parkedRaw + "台";
-
-            var popupContent = "<div class='popup-title'>" + park.name + "</div>" +
-                               "現在の状況：<b>" + currentStatus + "</b><br>" +
-                               "駐車可能台数：" + park.capacity + "台<br>" +
-                               "現在の駐車： " + popupParked + "<br>" +
-                               "現在の空き： <b>" + popupVacant + "</b>";
-
-            marker.bindPopup(popupContent);
-            parkingMarkers.push(marker);
-
-            tableHtml += "<tr><td>" + park.name + "</td><td class='" + textClass + "'>" + listStatusText + "</td></tr>";
-          });
-
-          document.getElementById('status-table').innerHTML = tableHtml;
-
-          var percent = 0;
-          if (totalCapacity > 0) percent = Math.round((totalVacant / totalCapacity) * 100);
-          document.getElementById('total-status').innerHTML = "全体：空" + totalVacant + "台 / " + totalCapacity + "台 (空き" + percent + "%)";
-
-          var now = new Date();
-          var hours = String(now.getHours()).padStart(2, '0');
-          var minutes = String(now.getMinutes()).padStart(2, '0');
-          document.getElementById('update-time').innerText = "(" + hours + ":" + minutes + " 時点)";
+        staffData.forEach(function(s) {
+          if (!s.lat || !s.lng || isNaN(s.lat) || isNaN(s.lng)) return;
+          var pinColor = (s.category === "駐禁") ? "#9c27b0" : "#4caf50";
           
-          if (btn) btn.innerText = "🔄 駐車場データを更新";
-        })
-        .catch(error => {
-          console.error("エラー:", error);
-          if (btn) btn.innerText = "🔄 駐車場データを更新";
+          var marker = L.circleMarker([s.lat, s.lng], {
+            color: '#ffffff', weight: 2, fillColor: pinColor, fillOpacity: 1.0, radius: 7
+          }).addTo(map);
+
+          var popupContent = "<div class='staff-popup-title'>📍 " + s.post + "</div>" +
+                             "<span style='color:gray; font-size:11px;'>分類：" + s.category + "担当</span><br>" +
+                             "リーダー：" + s.leader + "<br>" +
+                             "スタッフ：" + s.staff;
+          marker.bindPopup(popupContent);
+          staffMarkers.push(marker);
+
+          staffTableHtml += "<tr><td style='padding-top:6px; font-weight:bold; font-size:11px;'><span style='color:" + pinColor + "'>●</span> " + s.post + "</td></tr>";
+          staffTableHtml += "<tr><td style='padding-bottom:6px; font-size:10px; color:#555; border-bottom:1px dashed #eee;'>👤 " + s.staff + "</td></tr>";
         });
+        document.getElementById('staff-table').innerHTML = staffTableHtml;
+
+        // 2. 駐車場データの描画処理
+        parkingMarkers.forEach(marker => map.removeLayer(marker));
+        parkingMarkers = [];
+        var tableHtml = "";
+        var totalCapacity = 0;
+        var totalVacant = 0;
+
+        parkingData.forEach(park => {
+          if (!park.lat || !park.lng || isNaN(park.lat) || isNaN(park.lng)) return;
+
+          var capacity = Number(park.capacity);
+          var parkedRaw = park.status; 
+          var color = 'blue';
+          var currentStatus = "空きあり";
+          var listStatusText = "";
+          var textClass = 'status-text-blue';
+
+          if (parkedRaw === "未入力" || parkedRaw === "未報告" || parkedRaw === "") {
+            currentStatus = "未入力";
+            listStatusText = "<span style='color:gray; font-weight:normal;'>未入力</span>";
+            textClass = '';
+            totalCapacity += capacity;
+            totalVacant += capacity;
+          } else {
+            var parked = Number(parkedRaw);
+            var rate = parked / capacity;
+            totalCapacity += capacity;
+            totalVacant += Number(park.vacant);
+
+            if (rate >= 1.0) { color = 'red'; currentStatus = "満車"; listStatusText = "満車"; textClass = 'status-text-red'; }
+            else if (rate >= 0.7) { color = 'orange'; currentStatus = "混雑"; listStatusText = "混雑(空" + park.vacant + "台)"; textClass = 'status-text-orange'; }
+            else { color = 'blue'; currentStatus = "空きあり"; listStatusText = "空" + park.vacant + "台"; textClass = 'status-text-blue'; }
+          }
+
+          var marker = L.circleMarker([park.lat, park.lng], {
+            color: color, fillColor: color, fillOpacity: 0.8, radius: 12
+          }).addTo(map);
+
+          var popupVacant = (currentStatus === "未入力") ? "不明" : park.vacant + "台";
+          var popupParked = (currentStatus === "未入力") ? "不明" : parkedRaw + "台";
+
+          var popupContent = "<div class='popup-title'>" + park.name + "</div>" +
+                             "現在の状況：<b>" + currentStatus + "</b><br>" +
+                             "駐車可能台数：" + park.capacity + "台<br>" +
+                             "現在の駐車： " + popupParked + "<br>" +
+                             "現在の空き： <b>" + popupVacant + "</b>";
+
+          marker.bindPopup(popupContent);
+          parkingMarkers.push(marker);
+
+          tableHtml += "<tr><td>" + park.name + "</td><td class='" + textClass + "'>" + listStatusText + "</td></tr>";
+        });
+        document.getElementById('status-table').innerHTML = tableHtml;
+
+        var percent = 0;
+        if (totalCapacity > 0) percent = Math.round((totalVacant / totalCapacity) * 100);
+        document.getElementById('total-status').innerHTML = "全体：空" + totalVacant + "台 / " + totalCapacity + "台 (空き" + percent + "%)";
+
+        var now = new Date();
+        var hours = String(now.getHours()).padStart(2, '0');
+        var minutes = String(now.getMinutes()).padStart(2, '0');
+        document.getElementById('update-time').innerText = "(" + hours + ":" + minutes + " 時点)";
+        
+        if (btn) btn.innerText = "🔄 データを一括更新";
+      })
+      .catch(error => {
+        console.error("エラー:", error);
+        if (btn) btn.innerText = "🔄 データを一括更新";
+      });
     }
 
-    loadParkingData();
-    setInterval(loadParkingData, 60000);
+    // 初回読み込みと、1分ごとの定期更新の実行
+    updateAllData();
+    setInterval(updateAllData, 60000);
   </script>
 </body>
 </html>
