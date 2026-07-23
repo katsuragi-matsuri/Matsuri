@@ -11,67 +11,32 @@
     body { 
       margin: 0; padding: 0; font-family: sans-serif; 
       display: flex; 
-      flex-direction: column; /* 基本は縦並び（スマホ縦向き用） */
+      flex-direction: column; 
       height: 100vh; 
     }
     
-    /* メイン画面のデザイン（スマホ縦向きベース） */
     #map-wrapper { position: relative; flex: 1; width: 100%; min-height: 45vh; }
     #map { width: 100%; height: 100%; }
     #form-area { flex: 1; width: 100%; min-height: 55vh; border-top: 3px solid #333; }
     iframe { width: 100%; height: 100%; border: none; }
 
-    /* ★ 横画面（パソコン・タブレット・スマホ横向き）の時のレイアウト設定 ★ */
     @media (orientation: landscape) {
-      body {
-        flex-direction: row; /* 要素を左右に並べる */
-      }
-      #map-wrapper {
-        width: 60%; /* 地図を左側 60% の広さに */
-        height: 100vh;
-        min-height: auto;
-      }
-      #form-area {
-        width: 40%; /* フォームを右側 40% の広さに */
-        height: 100vh;
-        min-height: auto;
-        border-top: none; /* 上の境界線を消す */
-        border-left: 3px solid #333; /* 代わりに左側に境界線を引く */
-      }
+      body { flex-direction: row; }
+      #map-wrapper { width: 60%; height: 100vh; min-height: auto; }
+      #form-area { width: 40%; height: 100vh; min-height: auto; border-top: none; border-left: 3px solid #333; }
     }
     
-    /* パスワード画面のデザイン */
-    #password-overlay {
-      position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-      background-color: #e2f0d9;
-      z-index: 9999;
-      display: flex; flex-direction: column; align-items: center; justify-content: center;
-    }
-    #password-box {
-      background: white; padding: 30px; border-radius: 8px;
-      box-shadow: 0 4px 10px rgba(0,0,0,0.2); text-align: center;
-    }
+    #password-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background-color: #e2f0d9; z-index: 9999; display: flex; flex-direction: column; align-items: center; justify-content: center; }
+    #password-box { background: white; padding: 30px; border-radius: 8px; box-shadow: 0 4px 10px rgba(0,0,0,0.2); text-align: center; }
     #password-box h3 { margin-top: 0; color: #333; }
-    #password-input {
-      padding: 10px; font-size: 16px; margin-bottom: 15px;
-      width: 200px; border: 1px solid #ccc; border-radius: 4px; text-align: center;
-    }
-    #password-btn {
-      padding: 10px 20px; font-size: 16px; background-color: #4caf50;
-      color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: bold;
-    }
+    #password-input { padding: 10px; font-size: 16px; margin-bottom: 15px; width: 200px; border: 1px solid #ccc; border-radius: 4px; text-align: center; }
+    #password-btn { padding: 10px 20px; font-size: 16px; background-color: #4caf50; color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; }
     #password-error { color: red; display: none; font-size: 13px; margin-top: 10px; font-weight: bold; }
 
     .popup-title { font-weight: bold; font-size: 14px; margin-bottom: 5px; }
     .staff-popup-title { font-weight: bold; font-size: 13px; margin-bottom: 5px; color: #333; border-bottom: 2px solid #ccc; padding-bottom: 3px;}
 
-    /* パネルのデザイン */
-    #status-list-panel {
-      position: absolute; top: 10px; right: 10px; z-index: 1000;
-      background: rgba(255, 255, 255, 0.95); padding: 8px; border-radius: 5px;
-      box-shadow: 0 2px 5px rgba(0,0,0,0.3); max-height: 80%; overflow-y: auto;
-      font-size: 12px; pointer-events: auto; width: 200px;
-    }
+    #status-list-panel { position: absolute; top: 10px; right: 10px; z-index: 1000; background: rgba(255, 255, 255, 0.95); padding: 8px; border-radius: 5px; box-shadow: 0 2px 5px rgba(0,0,0,0.3); max-height: 80%; overflow-y: auto; font-size: 12px; pointer-events: auto; width: 200px; }
     
     .toggle-btn { background-color: #f8f9fa; border: 1px solid #ccc; padding: 6px 10px; border-radius: 4px; text-align: center; font-weight: bold; cursor: pointer; font-size: 12px; color: #333; margin-bottom: 5px; }
     #refresh-btn { background-color: #e9ecef; border: 1px solid #ccc; padding: 6px 10px; border-radius: 4px; text-align: center; font-weight: bold; cursor: pointer; font-size: 12px; color: #333; margin-top: 5px; }
@@ -196,12 +161,8 @@
       .then(([parkingData, staffData]) => {
         
         if (!Array.isArray(staffData)) {
-            console.error("スタッフデータ異常:", staffData);
             document.getElementById('staff-table').innerHTML = "<tr><td style='color:red;'>⚠️ データの形式エラーです。GASの設定を確認してください。</td></tr>";
             return;
-        }
-        if (staffData.length === 0) {
-            document.getElementById('staff-table').innerHTML = "<tr><td style='color:gray;'>⚠️ スプレッドシートにスタッフデータがありません。</td></tr>";
         }
 
         staffLayer.clearLayers();
@@ -209,15 +170,20 @@
         var validStaffCount = 0;
 
         staffData.forEach(function(s) {
-          if (!s.lat || !s.lng || isNaN(s.lat) || isNaN(s.lng)) return;
+          // ★ スプレッドシートの日本語見出し（緯度・経度）を読み込む
+          var lat = s.緯度;
+          var lng = s.経度;
+
+          if (!lat || !lng || isNaN(lat) || isNaN(lng)) return;
           
           validStaffCount++;
           
           var pinColor = "#2196f3";
           var pinEmoji = "👤";       
           
-          var categoryStr = s.category ? String(s.category) : "";
-          var postStr = s.post ? String(s.post) : "";
+          // ★ スプレッドシートの日本語見出し（分類・持ち場）を読み込む
+          var categoryStr = s.分類 ? String(s.分類) : "";
+          var postStr = s.持ち場 ? String(s.持ち場) : "";
           
           if (categoryStr.indexOf("駐禁") !== -1 || postStr.indexOf("駐禁") !== -1) {
             pinColor = "#9c27b0";
@@ -234,22 +200,23 @@
             iconAnchor: [15, 15]
           });
 
-          var marker = L.marker([s.lat, s.lng], { icon: customIcon });
+          var marker = L.marker([lat, lng], { icon: customIcon });
 
+          // ★ スプレッドシートの日本語見出し（リーダー・スタッフ）を読み込む
           var popupContent = "<div class='staff-popup-title'>📍 " + postStr + "</div>" +
                              "<span style='color:gray; font-size:11px;'>分類：" + categoryStr + "</span><br>" +
-                             "リーダー：" + (s.leader ? s.leader : "なし") + "<br>" +
-                             "スタッフ：" + (s.staff ? s.staff : "なし");
-          marker.bindPopup(popupContent);
+                             "リーダー：" + (s.リーダー ? s.リーダー : "なし") + "<br>" +
+                             "スタッフ：" + (s.スタッフ ? s.スタッフ : "なし");
           
+          marker.bindPopup(popupContent);
           staffLayer.addLayer(marker); 
 
           staffTableHtml += "<tr><td style='padding-top:6px; font-weight:bold; font-size:11px;'><span style='color:" + pinColor + "'>●</span> " + postStr + "</td></tr>";
-          staffTableHtml += "<tr><td style='padding-bottom:6px; font-size:10px; color:#555; border-bottom:1px dashed #eee;'>👤 " + (s.staff ? s.staff : "未定") + "</td></tr>";
+          staffTableHtml += "<tr><td style='padding-bottom:6px; font-size:10px; color:#555; border-bottom:1px dashed #eee;'>👤 " + (s.スタッフ ? s.スタッフ : "未定") + "</td></tr>";
         });
         
         if (staffData.length > 0 && validStaffCount === 0) {
-            staffTableHtml = "<tr><td style='color:red; font-size:11px;'>⚠️ 読み込めませんでした。<br>スプレッドシートの「lat(緯度)」「lng(経度)」列が空欄になっていないか、文字が混ざっていないか確認してください。</td></tr>";
+            staffTableHtml = "<tr><td style='color:red; font-size:11px;'>⚠️ 読み込めませんでした。<br>スプレッドシートの「緯度」「経度」列が空欄になっていないか確認してください。</td></tr>";
         }
         
         document.getElementById('staff-table').innerHTML = staffTableHtml;
@@ -328,7 +295,6 @@
     updateAllData();
     setInterval(updateAllData, 60000);
     
-    // 画面の向きが変わった時に地図の描画サイズを自動補正する
     window.addEventListener("orientationchange", function() {
       setTimeout(function() { map.invalidateSize(); }, 200);
     });
