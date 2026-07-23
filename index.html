@@ -21,8 +21,10 @@
       font-size: 13px; pointer-events: auto; width: 220px;
     }
     
-    .panel-title { text-align: center; font-weight: bold; font-size: 14px; margin-bottom: 8px; color: #333; }
-    .toggle-btn { background-color: #2196f3; color: white; border: none; padding: 8px 10px; border-radius: 4px; text-align: center; font-weight: bold; cursor: pointer; font-size: 13px; margin-bottom: 5px; }
+    /* 開閉ボタンのデザイン */
+    .toggle-btn { background-color: #2196f3; color: white; border: none; padding: 10px; border-radius: 4px; text-align: center; font-weight: bold; cursor: pointer; font-size: 14px; margin-bottom: 5px; box-shadow: 0 2px 4px rgba(0,0,0,0.2); }
+    .toggle-btn:active { background-color: #1976d2; }
+
     #refresh-btn { background-color: #e9ecef; border: 1px solid #ccc; padding: 6px 10px; border-radius: 4px; text-align: center; font-weight: bold; cursor: pointer; font-size: 12px; color: #333; margin-top: 10px; }
     #refresh-btn:active { background-color: #ced4da; }
     
@@ -45,14 +47,16 @@
   
   <!-- 右上の空き状況パネル -->
   <div id="status-list-panel">
-    <div class="panel-title">🚗 駐車場 空き状況</div>
+    <!-- ★開閉できるボタンに変更 -->
+    <div class="toggle-btn" id="toggle-btn" onclick="toggleList()">▼ 駐車場 空き状況</div>
+    
     <div id="list-content">
       <div id="total-status">全体：計算中...</div>
       <span id="update-time">(--:-- 時点)</span>
       <table id="status-table"></table>
+      <!-- 手動更新ボタン（リストの中に入れて、一緒に隠れるように調整） -->
+      <div id="refresh-btn" onclick="updateData()">🔄 最新の情報に更新</div>
     </div>
-    <!-- 手動更新ボタン -->
-    <div id="refresh-btn" onclick="updateData()">🔄 最新の情報に更新</div>
   </div>
 
   <script>
@@ -72,6 +76,19 @@
     
     var parkingLayer = L.layerGroup().addTo(map);
 
+    // ★リストの開閉プログラム
+    function toggleList() {
+      var content = document.getElementById('list-content');
+      var btn = document.getElementById('toggle-btn');
+      if (content.style.display === 'none') {
+        content.style.display = 'block';
+        btn.innerText = '▼ 駐車場 空き状況';
+      } else {
+        content.style.display = 'none';
+        btn.innerText = '📋 駐車場 空き状況';
+      }
+    }
+
     function updateData() {
       var btn = document.getElementById('refresh-btn');
       if (btn) btn.innerText = "🔄 更新中...";
@@ -80,12 +97,12 @@
       var timestamp = '_=' + new Date().getTime();
       var fetchUrl = gasUrl + (gasUrl.indexOf('?') > -1 ? '&' : '?') + timestamp;
 
-      // 駐車場データのみを取得（スタッフデータは取得しない）
+      // 駐車場データのみを取得
       fetch(fetchUrl)
         .then(res => res.json())
         .then(parkingData => {
           
-          parkingLayer.clearLayers(); // 古いピンを一括消去
+          parkingLayer.clearLayers();
           var tableHtml = "";
           var totalCapacity = 0;
           var totalVacant = 0;
@@ -100,7 +117,6 @@
             var listStatusText = "";
             var textClass = 'status-text-blue';
 
-            // 状況の判定
             if (parkedRaw === "未入力" || parkedRaw === "未報告" || parkedRaw === "") {
               currentStatus = "未入力";
               listStatusText = "<span style='color:gray; font-weight:normal;'>情報なし</span>";
@@ -122,12 +138,10 @@
               }
             }
 
-            // マップ上のピン作成
             var marker = L.circleMarker([park.lat, park.lng], {
-              color: color, fillColor: color, fillOpacity: 0.8, radius: 14 // 来場者向けに少し丸を大きく
+              color: color, fillColor: color, fillOpacity: 0.8, radius: 14
             });
 
-            // ポップアップの内容（シンプルに）
             var popupVacant = (currentStatus === "未入力") ? "情報なし" : park.vacant + "台";
             var popupContent = "<div class='popup-title'>" + park.name + "</div>" +
                                "<div style='font-size: 14px;'>状況：<b class='" + textClass + "'>" + currentStatus + "</b></div>" +
@@ -136,11 +150,9 @@
             marker.bindPopup(popupContent);
             parkingLayer.addLayer(marker);
 
-            // リストの行作成
             tableHtml += "<tr><td>" + park.name + "</td><td class='" + textClass + "'>" + listStatusText + "</td></tr>";
           });
 
-          // リストパネルの更新
           document.getElementById('status-table').innerHTML = tableHtml;
 
           var percent = 0;
