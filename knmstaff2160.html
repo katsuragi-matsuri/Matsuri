@@ -8,13 +8,43 @@
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <style>
-    body { margin: 0; padding: 0; font-family: sans-serif; display: flex; flex-direction: column; height: 100vh; }
+    body { 
+      margin: 0; padding: 0; font-family: sans-serif; 
+      display: flex; 
+      flex-direction: column; /* 基本は縦並び（スマホ縦向き用） */
+      height: 100vh; 
+    }
+    
+    /* メイン画面のデザイン（スマホ縦向きベース） */
+    #map-wrapper { position: relative; flex: 1; width: 100%; min-height: 45vh; }
+    #map { width: 100%; height: 100%; }
+    #form-area { flex: 1; width: 100%; min-height: 55vh; border-top: 3px solid #333; }
+    iframe { width: 100%; height: 100%; border: none; }
+
+    /* ★ 横画面（パソコン・タブレット・スマホ横向き）の時のレイアウト設定 ★ */
+    @media (orientation: landscape) {
+      body {
+        flex-direction: row; /* 要素を左右に並べる */
+      }
+      #map-wrapper {
+        width: 60%; /* 地図を左側 60% の広さに */
+        height: 100vh;
+        min-height: auto;
+      }
+      #form-area {
+        width: 40%; /* フォームを右側 40% の広さに */
+        height: 100vh;
+        min-height: auto;
+        border-top: none; /* 上の境界線を消す */
+        border-left: 3px solid #333; /* 代わりに左側に境界線を引く */
+      }
+    }
     
     /* パスワード画面のデザイン */
     #password-overlay {
       position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-      background-color: #e2f0d9; /* 背景色 */
-      z-index: 9999; /* 一番手前に表示 */
+      background-color: #e2f0d9;
+      z-index: 9999;
       display: flex; flex-direction: column; align-items: center; justify-content: center;
     }
     #password-box {
@@ -32,12 +62,6 @@
     }
     #password-error { color: red; display: none; font-size: 13px; margin-top: 10px; font-weight: bold; }
 
-    /* メイン画面のデザイン */
-    #map-wrapper { position: relative; flex: 1; width: 100%; min-height: 45vh; }
-    #map { width: 100%; height: 100%; }
-    #form-area { flex: 1; width: 100%; min-height: 55vh; border-top: 3px solid #333; }
-    iframe { width: 100%; height: 100%; border: none; }
-    
     .popup-title { font-weight: bold; font-size: 14px; margin-bottom: 5px; }
     .staff-popup-title { font-weight: bold; font-size: 13px; margin-bottom: 5px; color: #333; border-bottom: 2px solid #ccc; padding-bottom: 3px;}
 
@@ -68,7 +92,6 @@
 </head>
 <body>
   
-  <!-- パスワード入力画面のフタ -->
   <div id="password-overlay">
     <div id="password-box">
       <h3>🔒 スタッフ専用ページ</h3>
@@ -83,7 +106,6 @@
   <div id="map-wrapper">
     <div id="map"></div>
     <div id="status-list-panel">
-      <!-- 駐車場 空き状況ボタン -->
       <div class="toggle-btn" id="toggle-btn" onclick="toggleList()">📋 駐車場 空き状況</div>
       <div id="list-content">
         <div id="total-status">全体：計算中...</div>
@@ -91,40 +113,32 @@
         <table id="status-table"></table>
       </div>
 
-      <!-- スタッフ一覧ボタン -->
       <div class="toggle-btn" id="toggle-staff-btn" onclick="toggleStaffList()">👥 スタッフ配置一覧</div>
       <div id="staff-list-content">
         <table id="staff-table"></table>
       </div>
 
-      <!-- 手動更新ボタン -->
       <div id="refresh-btn" onclick="updateAllData()">🔄 データを一括更新</div>
     </div>
   </div>
 
   <div id="form-area">
-    <!-- GoogleフォームのURL -->
     <iframe src="https://forms.gle/JhWsFrFSXisuTKny9"></iframe>
   </div>
 
   <script>
-    // パスワード判定プログラム
     function checkPassword() {
       var input = document.getElementById('password-input').value;
-      
-      // ↓↓↓ 合言葉（パスワード）をここで設定します。自由に変更可能です ↓↓↓
       var correctPassword = "2160"; 
       
       if (input === correctPassword) {
         document.getElementById('password-overlay').style.display = 'none';
-        // フタが消えた後に地図のサイズを正しく再計算させる（バグ防止）
         setTimeout(function(){ map.invalidateSize(); }, 100);
       } else {
         document.getElementById('password-error').style.display = 'block';
       }
     }
 
-    // 地図の準備
     var googleStandard = L.tileLayer('https://mt1.google.com/vt/lyrs=r&x={x}&y={y}&z={z}', {
       attribution: "<a href='https://maps.google.com/' target='_blank'>Google Map</a>"
     });
@@ -132,18 +146,15 @@
       attribution: "<a href='https://maps.google.com/' target='_blank'>Google Map</a>"
     });
 
-    // ピンをまとめる透明シート
     var parkingLayer = L.layerGroup();
     var staffLayer = L.layerGroup();
 
-    // 地図の作成
     var map = L.map('map', {
       center: [34.295261575345286, 135.51751990257273],
       zoom: 15,
       layers: [googleStandard, parkingLayer, staffLayer]
     });
 
-    // 左上の切り替えメニュー作成
     var baseMaps = {
       "🗺️ 標準地図": googleStandard,
       "🛰️ 航空写真": googleHybrid
@@ -156,7 +167,6 @@
 
     var gasUrl = "https://script.google.com/macros/s/AKfycby31srJLpaJ8mVhonQMxIEQTQENDs-nYMBa9hNBoSV7uRjCF7n28CQOJu9YW14yFGGH/exec";
 
-    // リスト開閉機能
     function toggleList() {
       var content = document.getElementById('list-content');
       var btn = document.getElementById('toggle-btn');
@@ -171,7 +181,6 @@
       btn.innerText = (content.style.display === 'block') ? '▼ スタッフ配置一覧' : '👥 スタッフ配置一覧';
     }
 
-    // データ一括取得＆描画
     function updateAllData() {
       var btn = document.getElementById('refresh-btn');
       if (btn) btn.innerText = "🔄 更新中...";
@@ -186,12 +195,23 @@
       ])
       .then(([parkingData, staffData]) => {
         
-        // --- 1. スタッフピンの描画 ---
+        if (!Array.isArray(staffData)) {
+            console.error("スタッフデータ異常:", staffData);
+            document.getElementById('staff-table').innerHTML = "<tr><td style='color:red;'>⚠️ データの形式エラーです。GASの設定を確認してください。</td></tr>";
+            return;
+        }
+        if (staffData.length === 0) {
+            document.getElementById('staff-table').innerHTML = "<tr><td style='color:gray;'>⚠️ スプレッドシートにスタッフデータがありません。</td></tr>";
+        }
+
         staffLayer.clearLayers();
         var staffTableHtml = "";
+        var validStaffCount = 0;
 
         staffData.forEach(function(s) {
           if (!s.lat || !s.lng || isNaN(s.lat) || isNaN(s.lng)) return;
+          
+          validStaffCount++;
           
           var pinColor = "#2196f3";
           var pinEmoji = "👤";       
@@ -227,6 +247,11 @@
           staffTableHtml += "<tr><td style='padding-top:6px; font-weight:bold; font-size:11px;'><span style='color:" + pinColor + "'>●</span> " + postStr + "</td></tr>";
           staffTableHtml += "<tr><td style='padding-bottom:6px; font-size:10px; color:#555; border-bottom:1px dashed #eee;'>👤 " + (s.staff ? s.staff : "未定") + "</td></tr>";
         });
+        
+        if (staffData.length > 0 && validStaffCount === 0) {
+            staffTableHtml = "<tr><td style='color:red; font-size:11px;'>⚠️ 読み込めませんでした。<br>スプレッドシートの「lat(緯度)」「lng(経度)」列が空欄になっていないか、文字が混ざっていないか確認してください。</td></tr>";
+        }
+        
         document.getElementById('staff-table').innerHTML = staffTableHtml;
 
         // --- 2. 駐車場ピンの描画 ---
@@ -276,11 +301,10 @@
                              "現在の空き： <b>" + popupVacant + "</b>";
 
           marker.bindPopup(popupContent);
-          
           parkingLayer.addLayer(marker);
-
           tableHtml += "<tr><td>" + park.name + "</td><td class='" + textClass + "'>" + listStatusText + "</td></tr>";
         });
+        
         document.getElementById('status-table').innerHTML = tableHtml;
 
         var percent = 0;
@@ -296,13 +320,18 @@
       })
       .catch(error => {
         console.error("一括更新エラー:", error);
-        alert("データの読み込み処理でエラーが発生しました。\nGASの公開設定が『全員』になっているか、またはシート名が正しいかご確認ください。\nエラー内容: " + error.message);
+        alert("通信エラーが発生しました。\nGASのURLや公開設定を確認してください。\n詳細: " + error.message);
         if (btn) btn.innerText = "🔄 データを一括更新";
       });
     }
 
     updateAllData();
-    setInterval(updateAllData, 60000); // 1分ごとに自動更新
+    setInterval(updateAllData, 60000);
+    
+    // 画面の向きが変わった時に地図の描画サイズを自動補正する
+    window.addEventListener("orientationchange", function() {
+      setTimeout(function() { map.invalidateSize(); }, 200);
+    });
   </script>
 </body>
 </html>
