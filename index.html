@@ -67,34 +67,38 @@
   </div>
 
   <script>
-    // 1. 切り替えたい地図のデータを2種類とも準備する
+    // 1. 背景地図の準備
     var googleStandard = L.tileLayer('https://mt1.google.com/vt/lyrs=r&x={x}&y={y}&z={z}', {
       attribution: "<a href='https://maps.google.com/' target='_blank'>Google Map</a>"
     });
-
     var googleHybrid = L.tileLayer('https://mt1.google.com/vt/lyrs=y&x={x}&y={y}&z={z}', {
       attribution: "<a href='https://maps.google.com/' target='_blank'>Google Map</a>"
     });
 
-    // 2. 地図を作成し、最初は「標準地図」を表示させておく
+    // 2. ★ピンをまとめる「透明なシート」を作る
+    var parkingLayer = L.layerGroup();
+    var staffLayer = L.layerGroup();
+
+    // 3. 地図の作成（最初は標準地図、駐車場、スタッフをすべて表示しておく）
     var map = L.map('map', {
       center: [34.295261575345286, 135.51751990257273],
       zoom: 15,
-      layers: [googleStandard]
+      layers: [googleStandard, parkingLayer, staffLayer]
     });
 
-    // 3. 地図の切り替えメニューを作る
+    // 4. ★左上の切り替えメニューにチェックボックスを追加
     var baseMaps = {
       "🗺️ 標準地図": googleStandard,
       "🛰️ 航空写真": googleHybrid
     };
+    var overlayMaps = {
+      "🅿️ 駐車場ピン": parkingLayer,
+      "👥 スタッフピン": staffLayer
+    };
+    // 地図にメニューボタンを設置
+    L.control.layers(baseMaps, overlayMaps, { position: 'topleft' }).addTo(map);
 
-    // 画面の左上に切り替えボタンを配置する（右側はリストがあるため）
-    L.control.layers(baseMaps, null, { position: 'topleft' }).addTo(map);
-
-    var gasUrl = "https://script.google.com/macros/s/AKfycbz4Y5CLI1lClReA_rkjtC5bjKpqw_iY_DldGUKp74dPC26qnxAkmvTay99tdLJ7UlHh/exec";
-    var parkingMarkers = [];
-    var staffMarkers = [];
+    var gasUrl = "https://script.google.com/macros/s/AKfycby31srJLpaJ8mVhonQMxIEQTQENDs-nYMBa9hNBoSV7uRjCF7n28CQOJu9YW14yFGGH/exec";
 
     function toggleList() {
       var content = document.getElementById('list-content');
@@ -124,29 +128,25 @@
       ])
       .then(([parkingData, staffData]) => {
         
-        // 1. スタッフデータの描画処理
-        staffMarkers.forEach(marker => map.removeLayer(marker));
-        staffMarkers = [];
+        // --- スタッフピンの描画 ---
+        staffLayer.clearLayers(); // 古いピンを一括消去
         var staffTableHtml = "";
 
         staffData.forEach(function(s) {
           if (!s.lat || !s.lng || isNaN(s.lat) || isNaN(s.lng)) return;
           
-          var pinColor = "#2196f3"; // その他（青）
+          var pinColor = "#2196f3";
           var pinEmoji = "👤";       
           
-          // ★★★ 対策：未入力やエラーを防ぐため、文字列に強制変換して安全にチェックする ★★★
           var categoryStr = s.category ? String(s.category) : "";
           var postStr = s.post ? String(s.post) : "";
           
           if (categoryStr.indexOf("駐禁") !== -1 || postStr.indexOf("駐禁") !== -1) {
-            pinColor = "#9c27b0"; // 紫（駐禁担当）
-          } 
-          else if (categoryStr.indexOf("駐車場") !== -1 || postStr.indexOf("駐車場") !== -1) {
-            pinColor = "#4caf50"; // 緑（駐車場担当）
-          } 
-          else if (categoryStr.indexOf("会場") !== -1 || postStr.indexOf("会場") !== -1) {
-            pinColor = "#e91e63"; // ピンク（会場担当）
+            pinColor = "#9c27b0";
+          } else if (categoryStr.indexOf("駐車場") !== -1 || postStr.indexOf("駐車場") !== -1) {
+            pinColor = "#4caf50";
+          } else if (categoryStr.indexOf("会場") !== -1 || postStr.indexOf("会場") !== -1) {
+            pinColor = "#e91e63";
           }
           
           var customIcon = L.divIcon({
@@ -156,23 +156,24 @@
             iconAnchor: [15, 15]
           });
 
-          var marker = L.marker([s.lat, s.lng], { icon: customIcon }).addTo(map);
+          // 直接mapではなく、staffLayer（透明シート）にピンを置く
+          var marker = L.marker([s.lat, s.lng], { icon: customIcon });
 
           var popupContent = "<div class='staff-popup-title'>📍 " + postStr + "</div>" +
                              "<span style='color:gray; font-size:11px;'>分類：" + categoryStr + "</span><br>" +
                              "リーダー：" + (s.leader ? s.leader : "なし") + "<br>" +
                              "スタッフ：" + (s.staff ? s.staff : "なし");
           marker.bindPopup(popupContent);
-          staffMarkers.push(marker);
+          
+          staffLayer.addLayer(marker); 
 
           staffTableHtml += "<tr><td style='padding-top:6px; font-weight:bold; font-size:11px;'><span style='color:" + pinColor + "'>●</span> " + postStr + "</td></tr>";
           staffTableHtml += "<tr><td style='padding-bottom:6px; font-size:10px; color:#555; border-bottom:1px dashed #eee;'>👤 " + (s.staff ? s.staff : "未定") + "</td></tr>";
         });
         document.getElementById('staff-table').innerHTML = staffTableHtml;
 
-        // 2. 駐車場データの描画処理
-        parkingMarkers.forEach(marker => map.removeLayer(marker));
-        parkingMarkers = [];
+        // --- 駐車場ピンの描画 ---
+        parkingLayer.clearLayers(); // 古いピンを一括消去
         var tableHtml = "";
         var totalCapacity = 0;
         var totalVacant = 0;
@@ -204,9 +205,10 @@
             else { color = 'blue'; currentStatus = "空きあり"; listStatusText = "空" + park.vacant + "台"; textClass = 'status-text-blue'; }
           }
 
+          // 直接mapではなく、parkingLayer（透明シート）にピンを置く
           var marker = L.circleMarker([park.lat, park.lng], {
             color: color, fillColor: color, fillOpacity: 0.8, radius: 12
-          }).addTo(map);
+          });
 
           var popupVacant = (currentStatus === "未入力") ? "不明" : park.vacant + "台";
           var popupParked = (currentStatus === "未入力") ? "不明" : parkedRaw + "台";
@@ -218,7 +220,8 @@
                              "現在の空き： <b>" + popupVacant + "</b>";
 
           marker.bindPopup(popupContent);
-          parkingMarkers.push(marker);
+          
+          parkingLayer.addLayer(marker);
 
           tableHtml += "<tr><td>" + park.name + "</td><td class='" + textClass + "'>" + listStatusText + "</td></tr>";
         });
