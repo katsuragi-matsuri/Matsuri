@@ -155,35 +155,18 @@
       ])
       .then(([parkingData, staffData]) => {
         
-        if (!Array.isArray(staffData)) {
-            document.getElementById('staff-table').innerHTML = "<tr><td style='color:red;'>⚠️ データの形式エラーです。GASの設定を確認してください。</td></tr>";
-            return;
-        }
-
         staffLayer.clearLayers();
         var staffTableHtml = "";
-        var validStaffCount = 0;
 
+        // 送っていただいた完璧なGASのデータ（category, post, leader, staff, lat, lng）をそのまま読み込む
         staffData.forEach(function(s) {
+          if (!s.lat || !s.lng || isNaN(s.lat) || isNaN(s.lng)) return;
           
-          var lat, lng, categoryStr = "", postStr = "", leaderStr = "", staffStr = "";
-          
-          // ★最強読み取り機能：スプレッドシートの見出しに空白が混ざっていても強引に探し出す
-          for (var key in s) {
-            // 見出しの文字から、見えないスペースや改行をすべて消去
-            var k = key.trim().replace(/\s+/g, ""); 
-            
-            if (k === "lat" || k === "緯度") lat = s[key];
-            else if (k === "lng" || k === "経度") lng = s[key];
-            else if (k === "category" || k === "分類") categoryStr = String(s[key]);
-            else if (k === "post" || k === "持ち場") postStr = String(s[key]);
-            else if (k === "leader" || k === "リーダー") leaderStr = String(s[key]);
-            else if (k === "staff" || k === "スタッフ") staffStr = String(s[key]);
-          }
+          var categoryStr = s.category ? String(s.category) : "";
+          var postStr = s.post ? String(s.post) : "名称不明";
+          var leaderStr = s.leader ? String(s.leader) : "なし";
+          var staffStr = s.staff ? String(s.staff) : "未定";
 
-          if (!lat || !lng || isNaN(lat) || isNaN(lng)) return;
-          
-          validStaffCount++;
           var pinColor = "#2196f3";
           var pinEmoji = "👤";       
           
@@ -202,23 +185,19 @@
             iconAnchor: [15, 15]
           });
 
-          var marker = L.marker([lat, lng], { icon: customIcon });
+          var marker = L.marker([s.lat, s.lng], { icon: customIcon });
 
-          var popupContent = "<div class='staff-popup-title'>📍 " + (postStr ? postStr : "名称不明") + "</div>" +
+          var popupContent = "<div class='staff-popup-title'>📍 " + postStr + "</div>" +
                              "<span style='color:gray; font-size:11px;'>分類：" + (categoryStr ? categoryStr : "なし") + "</span><br>" +
-                             "リーダー：" + (leaderStr ? leaderStr : "なし") + "<br>" +
-                             "スタッフ：" + (staffStr ? staffStr : "未定");
+                             "リーダー：" + leaderStr + "<br>" +
+                             "スタッフ：" + staffStr;
           
           marker.bindPopup(popupContent);
           staffLayer.addLayer(marker); 
 
-          staffTableHtml += "<tr><td style='padding-top:6px; font-weight:bold; font-size:11px;'><span style='color:" + pinColor + "'>●</span> " + (postStr ? postStr : "名称不明") + "</td></tr>";
-          staffTableHtml += "<tr><td style='padding-bottom:6px; font-size:10px; color:#555; border-bottom:1px dashed #eee;'>👤 " + (staffStr ? staffStr : "未定") + "</td></tr>";
+          staffTableHtml += "<tr><td style='padding-top:6px; font-weight:bold; font-size:11px;'><span style='color:" + pinColor + "'>●</span> " + postStr + "</td></tr>";
+          staffTableHtml += "<tr><td style='padding-bottom:6px; font-size:10px; color:#555; border-bottom:1px dashed #eee;'>👤 " + staffStr + "</td></tr>";
         });
-        
-        if (staffData.length > 0 && validStaffCount === 0) {
-            staffTableHtml = "<tr><td style='color:red; font-size:11px;'>⚠️ 読み込めませんでした。<br>スプレッドシートの「緯度」「経度」列が空欄になっていないか確認してください。</td></tr>";
-        }
         
         document.getElementById('staff-table').innerHTML = staffTableHtml;
 
