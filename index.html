@@ -13,6 +13,22 @@
     
     .popup-title { font-weight: bold; font-size: 15px; margin-bottom: 5px; border-bottom: 2px solid #ccc; padding-bottom: 3px; }
 
+    /* ナビゲーションボタンのデザイン */
+    .nav-btn {
+      display: block;
+      margin-top: 10px;
+      padding: 8px 12px;
+      background-color: #4285f4; /* Googleブルー */
+      color: white !important;
+      text-decoration: none;
+      border-radius: 5px;
+      font-weight: bold;
+      font-size: 14px;
+      text-align: center;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+    }
+    .nav-btn:active { background-color: #0d47a1; }
+
     /* パネルのデザイン（スマホでも見やすいように） */
     #status-list-panel {
       position: absolute; top: 10px; right: 10px; z-index: 1000;
@@ -42,41 +58,34 @@
 </head>
 <body>
   
-  <!-- 地図の表示エリア（全画面） -->
   <div id="map"></div>
   
-  <!-- 右上の空き状況パネル -->
   <div id="status-list-panel">
-    <!-- ★開閉できるボタンに変更 -->
     <div class="toggle-btn" id="toggle-btn" onclick="toggleList()">▼ 駐車場 空き状況</div>
     
     <div id="list-content">
       <div id="total-status">全体：計算中...</div>
       <span id="update-time">(--:-- 時点)</span>
       <table id="status-table"></table>
-      <!-- 手動更新ボタン（リストの中に入れて、一緒に隠れるように調整） -->
       <div id="refresh-btn" onclick="updateData()">🔄 最新の情報に更新</div>
     </div>
   </div>
 
   <script>
-    // ライセンスフリーのOpenStreetMapを利用（一般公開用として最適）
-    var osmLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-      attribution: '&copy; <a href="http://osm.org/copyright">OpenStreetMap</a> contributors'
+    // 背景地図をGoogleマップ（標準）に変更
+    var googleStandard = L.tileLayer('https://mt1.google.com/vt/lyrs=r&x={x}&y={y}&z={z}', {
+      attribution: "<a href='https://maps.google.com/' target='_blank'>Google Map</a>"
     });
 
     var map = L.map('map', {
       center: [34.295261575345286, 135.51751990257273],
       zoom: 15,
-      layers: [osmLayer]
+      layers: [googleStandard]
     });
 
-    // バックエンド（GAS）のURL
     var gasUrl = "https://script.google.com/macros/s/AKfycby31srJLpaJ8mVhonQMxIEQTQENDs-nYMBa9hNBoSV7uRjCF7n28CQOJu9YW14yFGGH/exec";
-    
     var parkingLayer = L.layerGroup().addTo(map);
 
-    // ★リストの開閉プログラム
     function toggleList() {
       var content = document.getElementById('list-content');
       var btn = document.getElementById('toggle-btn');
@@ -93,11 +102,9 @@
       var btn = document.getElementById('refresh-btn');
       if (btn) btn.innerText = "🔄 更新中...";
 
-      // キャッシュ回避
       var timestamp = '_=' + new Date().getTime();
       var fetchUrl = gasUrl + (gasUrl.indexOf('?') > -1 ? '&' : '?') + timestamp;
 
-      // 駐車場データのみを取得
       fetch(fetchUrl)
         .then(res => res.json())
         .then(parkingData => {
@@ -142,10 +149,16 @@
               color: color, fillColor: color, fillOpacity: 0.8, radius: 14
             });
 
+            // ★ ナビ用のGoogleマップURLを生成（現在の位置から目的地までのルート検索画面が開く）
+            var navUrl = "https://www.google.com/maps/dir/?api=1&destination=" + park.lat + "," + park.lng;
+
             var popupVacant = (currentStatus === "未入力") ? "情報なし" : park.vacant + "台";
+            
+            // ★ ポップアップの中に青いナビゲーションボタンを追加
             var popupContent = "<div class='popup-title'>" + park.name + "</div>" +
                                "<div style='font-size: 14px;'>状況：<b class='" + textClass + "'>" + currentStatus + "</b></div>" +
-                               "<div style='font-size: 13px; margin-top: 4px;'>空き台数： " + popupVacant + " / " + park.capacity + "台</div>";
+                               "<div style='font-size: 13px; margin-top: 4px;'>空き台数： " + popupVacant + " / " + park.capacity + "台</div>" +
+                               "<a href='" + navUrl + "' target='_blank' class='nav-btn'>🚗 ここへナビを開始</a>";
 
             marker.bindPopup(popupContent);
             parkingLayer.addLayer(marker);
@@ -172,7 +185,6 @@
         });
     }
 
-    // 初回読み込みと1分ごとの自動更新
     updateData();
     setInterval(updateData, 60000);
   </script>
