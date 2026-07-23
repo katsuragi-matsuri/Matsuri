@@ -8,12 +8,7 @@
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <style>
-    body { 
-      margin: 0; padding: 0; font-family: sans-serif; 
-      display: flex; 
-      flex-direction: column; 
-      height: 100vh; 
-    }
+    body { margin: 0; padding: 0; font-family: sans-serif; display: flex; flex-direction: column; height: 100vh; }
     
     #map-wrapper { position: relative; flex: 1; width: 100%; min-height: 45vh; }
     #map { width: 100%; height: 100%; }
@@ -170,20 +165,27 @@
         var validStaffCount = 0;
 
         staffData.forEach(function(s) {
-          // ★ スプレッドシートの日本語見出し（緯度・経度）を読み込む
-          var lat = s.緯度;
-          var lng = s.経度;
+          
+          var lat, lng, categoryStr = "", postStr = "", leaderStr = "", staffStr = "";
+          
+          // ★最強読み取り機能：スプレッドシートの見出しに空白が混ざっていても強引に探し出す
+          for (var key in s) {
+            // 見出しの文字から、見えないスペースや改行をすべて消去
+            var k = key.trim().replace(/\s+/g, ""); 
+            
+            if (k === "lat" || k === "緯度") lat = s[key];
+            else if (k === "lng" || k === "経度") lng = s[key];
+            else if (k === "category" || k === "分類") categoryStr = String(s[key]);
+            else if (k === "post" || k === "持ち場") postStr = String(s[key]);
+            else if (k === "leader" || k === "リーダー") leaderStr = String(s[key]);
+            else if (k === "staff" || k === "スタッフ") staffStr = String(s[key]);
+          }
 
           if (!lat || !lng || isNaN(lat) || isNaN(lng)) return;
           
           validStaffCount++;
-          
           var pinColor = "#2196f3";
           var pinEmoji = "👤";       
-          
-          // ★ スプレッドシートの日本語見出し（分類・持ち場）を読み込む
-          var categoryStr = s.分類 ? String(s.分類) : "";
-          var postStr = s.持ち場 ? String(s.持ち場) : "";
           
           if (categoryStr.indexOf("駐禁") !== -1 || postStr.indexOf("駐禁") !== -1) {
             pinColor = "#9c27b0";
@@ -202,17 +204,16 @@
 
           var marker = L.marker([lat, lng], { icon: customIcon });
 
-          // ★ スプレッドシートの日本語見出し（リーダー・スタッフ）を読み込む
-          var popupContent = "<div class='staff-popup-title'>📍 " + postStr + "</div>" +
-                             "<span style='color:gray; font-size:11px;'>分類：" + categoryStr + "</span><br>" +
-                             "リーダー：" + (s.リーダー ? s.リーダー : "なし") + "<br>" +
-                             "スタッフ：" + (s.スタッフ ? s.スタッフ : "なし");
+          var popupContent = "<div class='staff-popup-title'>📍 " + (postStr ? postStr : "名称不明") + "</div>" +
+                             "<span style='color:gray; font-size:11px;'>分類：" + (categoryStr ? categoryStr : "なし") + "</span><br>" +
+                             "リーダー：" + (leaderStr ? leaderStr : "なし") + "<br>" +
+                             "スタッフ：" + (staffStr ? staffStr : "未定");
           
           marker.bindPopup(popupContent);
           staffLayer.addLayer(marker); 
 
-          staffTableHtml += "<tr><td style='padding-top:6px; font-weight:bold; font-size:11px;'><span style='color:" + pinColor + "'>●</span> " + postStr + "</td></tr>";
-          staffTableHtml += "<tr><td style='padding-bottom:6px; font-size:10px; color:#555; border-bottom:1px dashed #eee;'>👤 " + (s.スタッフ ? s.スタッフ : "未定") + "</td></tr>";
+          staffTableHtml += "<tr><td style='padding-top:6px; font-weight:bold; font-size:11px;'><span style='color:" + pinColor + "'>●</span> " + (postStr ? postStr : "名称不明") + "</td></tr>";
+          staffTableHtml += "<tr><td style='padding-bottom:6px; font-size:10px; color:#555; border-bottom:1px dashed #eee;'>👤 " + (staffStr ? staffStr : "未定") + "</td></tr>";
         });
         
         if (staffData.length > 0 && validStaffCount === 0) {
